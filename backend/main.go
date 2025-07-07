@@ -8,35 +8,39 @@ import (
 	"regexp"
 )
 
-type apiHandler struct{}
+type apiHandler struct {
+	urlDb  urlStore
+	userDb userStore
+}
 type shortUrlHandler struct {
-	store urlStore
+	urlDb urlStore
 }
 
 var (
 	usersPathRegEx       = regexp.MustCompile(`^users\/*$`)
-	usersPathWithIdRegEx = regexp.MustCompile(`^users\/([a-z0-9]+)$`)
+	usersPathWithIdRegEx = regexp.MustCompile(`^users\/([a-z0-9-]+)$`)
 	urlsPathRegEx        = regexp.MustCompile(`^urls\/*$`)
 	urlsPathWithIdRegEx  = regexp.MustCompile(`^urls\/([a-z0-9]+)$`)
 )
 
-func (h *shortUrlHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("Request received at short URl", req.PathValue("short_url"))
-	if req.PathValue("short_url") == "google" {
-		http.Redirect(w, req, "https://www.google.com", http.StatusTemporaryRedirect)
-	}
-}
-
 func main() {
-	_, dbErr := initDB()
+	db, dbErr := initDB()
 
 	if dbErr != nil {
 		fmt.Println("Error initializing database:", dbErr)
-		os.Exit(1)
 	}
 
-	http.Handle("/{short_url}", &shortUrlHandler{})
-	http.Handle("/api/{route...}", &apiHandler{})
+	db.AutoMigrate(&User{}, &Url{})
+
+	apiHandler := &apiHandler{
+		urlDb:  &urlStoreImpl{db: db},
+		userDb: &userStoreImpl{db: db},
+	}
+
+	http.Handle("/{short_url}", &shortUrlHandler{
+		urlDb: &urlStoreImpl{db: db},
+	})
+	http.Handle("/api/{route...}", apiHandler)
 
 	fmt.Println("Starting application on port", 8090)
 	err := http.ListenAndServe(":8090", nil)

@@ -4,19 +4,20 @@ import (
 	"time"
 )
 
-type user struct {
+type User struct {
 	ID           string    `json:"id" gorm:"primaryKey"`
-	Email        string    `json:"email"`
+	Email        string    `json:"email" gorm:"unique"`
 	PasswordHash string    `json:"password_hash"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-type url struct {
-	ShortUrl  string    `json:"short_url" gorm:"primaryKey"`
+type Url struct {
+	ID        string    `json:"id" gorm:"primaryKey"`
+	ShortUrl  string    `json:"short_url" gorm:"unique"`
 	LongUrl   string    `json:"long_url"`
-	UserToken string    `json:"user_token"`
+	UserId    string    `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	User      user      `gorm:"foreignKey:UserToken"`
+	User      User      `gorm:"foreignKey:UserId"`
 }
