@@ -15,8 +15,8 @@ type user struct {
 type url struct {
 	ShortUrl  string    `json:"short_url" gorm:"primaryKey"`
 	LongUrl   string    `json:"long_url"`
+	UserToken string    `json:"user_token"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	UserID    string    `json:"user_id"`
-	User      user      `gorm:"foreignKey:UserID"`
+	User      user      `gorm:"foreignKey:UserToken"`
 }
