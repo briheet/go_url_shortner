@@ -21,7 +21,6 @@ func (h *shortUrlHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (h *apiHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	resourcePath := req.PathValue("route")
 	method := req.Method
-	// userToken, err := req.Cookie("user_token")
 
 	switch {
 	case method == http.MethodGet:
@@ -199,43 +198,40 @@ func (h *apiHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintln(w, "User created", entry.ID)
 }
 
-// func (h *apiHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
-// 	var requestData struct {
-// 		Email    string `json:"email"`
-// 		Password string `json:"password"`
-// 	}
-//
-// 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-// 		http.Error(w, "Invalid Data", http.StatusBadRequest)
-// 		fmt.Println("Error decoding data:", err)
-// 		return
-// 	}
-//
-// 	user, err := h.userDb.GetByEmail(requestData.Email)
-// 	if err != nil {
-// 		http.Error(w, "User not found", http.StatusNotFound)
-// 		fmt.Println("User not found for email:", requestData.Email)
-// 		return
-// 	}
-//
-// 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(requestData.Password)); err != nil {
-// 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-// 		fmt.Println("Invalid credentials for user:", user.ID)
-// 		return
-// 	}
-//
-// 	cookie := &http.Cookie{
-// 		Name:     "user_token",
-// 		Value:    user.ID,
-// 		HttpOnly: true,
-// 		Secure:   true,
-// 		SameSite: http.SameSiteStrictMode,
-// 	}
-//
-// 	http.SetCookie(w, cookie)
-//
-// 	fmt.Fprintln(w, "Login successful for user", user.ID)
-// }
+func (h *apiHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
+	var requestData struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid Data", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userDb.GetByEmail(requestData.Email)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(requestData.Password)); err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	cookie := &http.Cookie{
+		Name:     "user_token",
+		Value:    user.ID,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	http.SetCookie(w, cookie)
+
+	fmt.Fprintln(w, "Login successful for user", user.ID)
+}
 
 func (h *apiHandler) GetUser(w http.ResponseWriter, req *http.Request) {
 	userId := strings.TrimPrefix(req.PathValue("route"), "users/")

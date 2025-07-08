@@ -23,6 +23,20 @@ var (
 	urlsPathWithIdRegEx  = regexp.MustCompile(`^urls\/([a-z0-9]+)$`)
 )
 
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+
+		userToken := req.Header.Get("Authorization")
+
+		if userToken == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
 func main() {
 	db, dbErr := initDB()
 
@@ -40,7 +54,9 @@ func main() {
 	http.Handle("/{short_url}", &shortUrlHandler{
 		urlDb: &urlStoreImpl{db: db},
 	})
-	http.Handle("/api/{route...}", apiHandler)
+	http.HandleFunc("POST /api/register", apiHandler.RegisterUser)
+	http.HandleFunc("POST /api/login", apiHandler.LoginUser)
+	http.Handle("/api/{route...}", authMiddleware(apiHandler))
 
 	fmt.Println("Starting application on port", 8090)
 	err := http.ListenAndServe(":8090", nil)

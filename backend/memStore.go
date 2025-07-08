@@ -19,7 +19,7 @@ type urlStore interface {
 type userStore interface {
 	Add(entry *User) error
 	GetById(userToken string) (User, error)
-	// GetByEmail(email string) (User, error)
+	GetByEmail(email string) (User, error)
 	Update(userToken string, entry *User) error
 	Remove(userToken string) error
 }
@@ -68,6 +68,12 @@ func (s *userStoreImpl) Add(entry *User) error {
 func (s *userStoreImpl) GetById(userId string) (User, error) {
 	var entry User
 	result := s.db.First(&entry, "id = ?", userId)
+	return entry, result.Error
+}
+
+func (s *userStoreImpl) GetByEmail(email string) (User, error) {
+	var entry User
+	result := s.db.First(&entry, "email = ?", email)
 	return entry, result.Error
 }
 
