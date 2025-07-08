@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type urlStore interface {
@@ -105,4 +107,16 @@ func initDB() (*gorm.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+func HashPassword(password string) (string, error) {
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedBytes), nil
+}
+
+func VerifyPassword(hashedPassword, providedPassword string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(providedPassword))
 }

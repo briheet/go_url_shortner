@@ -173,11 +173,10 @@ func (h *apiHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	passwordHash, passErr := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
+	passwordHash, passErr := HashPassword(requestData.Password)
 
 	if passErr != nil {
 		http.Error(w, "Error creating account", http.StatusInternalServerError)
-		fmt.Println("Error hashing password:", passErr)
 		return
 	}
 
@@ -186,8 +185,6 @@ func (h *apiHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 		Email:        requestData.Email,
 		PasswordHash: string(passwordHash),
 	}
-
-	fmt.Println("Creating user with ID:", entry)
 
 	if err := h.userDb.Add(entry); err != nil {
 		http.Error(w, "Error creating user", http.StatusInternalServerError)
@@ -215,7 +212,7 @@ func (h *apiHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(requestData.Password)); err != nil {
+	if err := VerifyPassword(user.PasswordHash, requestData.Password); err != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
