@@ -4,6 +4,15 @@ import (
 	"time"
 )
 
+type RefreshToken struct {
+	Token     string    `json:"token" gorm:"primaryKey"`
+	UserId    string    `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Revoked   bool      `json:"revoked" gorm:"default:false"`
+	User      User      `gorm:"foreignKey:UserId"`
+}
+
 type User struct {
 	ID           string    `json:"id" gorm:"primaryKey"`
 	Email        string    `json:"email" gorm:"unique"`

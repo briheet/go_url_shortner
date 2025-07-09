@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
@@ -19,11 +21,17 @@ type urlStore interface {
 }
 
 type userStore interface {
-	Add(entry *User) error
+	Add(email, hashedPassword string) (*User, error)
 	GetById(userToken string) (User, error)
 	GetByEmail(email string) (User, error)
 	Update(userToken string, entry *User) error
 	Remove(userToken string) error
+}
+
+type refreshTokenStore interface {
+	GenerateRefreshToken(userId string, ttl time.Duration) (*RefreshToken, error)
+	GetRefreshToken(tokenString string) (*RefreshToken, error)
+	RevokeRefreshToken(token *RefreshToken) error
 }
 
 type urlStoreImpl struct {
@@ -31,6 +39,10 @@ type urlStoreImpl struct {
 }
 
 type userStoreImpl struct {
+	db *gorm.DB
+}
+
+type refreshTokenStoreImpl struct {
 	db *gorm.DB
 }
 
@@ -62,9 +74,14 @@ func (s *urlStoreImpl) Remove(shortUrl string) error {
 	return result.Error
 }
 
-func (s *userStoreImpl) Add(entry *User) error {
+func (s *userStoreImpl) Add(email, hashedPassword string) (*User, error) {
+	entry := &User{
+		ID:           uuid.NewString(),
+		Email:        email,
+		PasswordHash: hashedPassword,
+	}
 	result := s.db.Create(entry)
-	return result.Error
+	return entry, result.Error
 }
 
 func (s *userStoreImpl) GetById(userId string) (User, error) {
@@ -88,6 +105,39 @@ func (s *userStoreImpl) Remove(userId string) error {
 	result := s.db.Delete(&User{
 		ID: userId,
 	})
+	return result.Error
+}
+
+func (s *refreshTokenStoreImpl) GenerateRefreshToken(userId string, ttl time.Duration) (*RefreshToken, error) {
+	tokenId := uuid.NewString()
+	expiresAt := time.Now().Add(ttl)
+
+	refreshToken := &RefreshToken{
+		UserId:    userId,
+		Token:     tokenId,
+		ExpiresAt: expiresAt,
+	}
+
+	if err := s.db.Create(refreshToken).Error; err != nil {
+		return nil, err
+	}
+
+	return refreshToken, nil
+}
+
+func (s *refreshTokenStoreImpl) GetRefreshToken(tokenString string) (*RefreshToken, error) {
+	var refreshToken RefreshToken
+	result := s.db.First(&refreshToken, "token = ?", tokenString)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &refreshToken, nil
+}
+
+func (s *refreshTokenStoreImpl) RevokeRefreshToken(token *RefreshToken) error {
+	result := s.db.Save(token)
 	return result.Error
 }
 

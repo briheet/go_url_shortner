@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func (h *shortUrlHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -16,6 +18,86 @@ func (h *shortUrlHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	http.Redirect(w, req, url.LongUrl, http.StatusTemporaryRedirect)
+}
+
+func (h *authHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
+	var requestData Credentials
+
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid data", http.StatusBadRequest)
+		return
+	}
+
+	if requestData.Email == "" || requestData.Password == "" {
+		http.Error(w, "Email, username, and password are required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.authService.Register(requestData.Email, requestData.Password)
+	if err != nil {
+		if errors.Is(err, ErrEmailInUse) {
+			http.Error(w, "Email already in use", http.StatusConflict)
+			return
+		}
+
+		http.Error(w, "Error creating user", http.StatusInternalServerError)
+		return
+	}
+
+	response := RegisterResponse{
+		ID:    user.ID,
+		Email: user.Email,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(&response)
+}
+
+func (h *authHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
+	var requestData Credentials
+
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid data", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.authService.Login(requestData.Email, requestData.Password)
+	if err != nil {
+		if errors.Is(err, ErrInvalidCredentials) {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response := &LoginResponse{Token: token}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *authHandler) RefreshToken(w http.ResponseWriter, req *http.Request) {
+	var requestData RefreshRequest
+
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid data", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.authService.RefreshAccessToken(requestData.RefreshToken)
+	if err != nil {
+		if errors.Is(err, ErrInvalidToken) || errors.Is(err, ErrExpiredToken) {
+			http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response := &RefreshResponse{Token: token}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *apiHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -159,75 +241,6 @@ func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
 
 	fmt.Println("Url deleted", req.PathValue("route"))
 	fmt.Fprintln(w, "URL deleted", urlId)
-}
-
-func (h *apiHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
-	var requestData struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-
-	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid Data", http.StatusBadRequest)
-		fmt.Println("Error decoding data:", err)
-		return
-	}
-
-	passwordHash, passErr := HashPassword(requestData.Password)
-
-	if passErr != nil {
-		http.Error(w, "Error creating account", http.StatusInternalServerError)
-		return
-	}
-
-	entry := &User{
-		ID:           uuid.NewString(),
-		Email:        requestData.Email,
-		PasswordHash: string(passwordHash),
-	}
-
-	if err := h.userDb.Add(entry); err != nil {
-		http.Error(w, "Error creating user", http.StatusInternalServerError)
-		fmt.Println("Error creating user:", err)
-		return
-	}
-
-	fmt.Fprintln(w, "User created", entry.ID)
-}
-
-func (h *apiHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
-	var requestData struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-
-	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid Data", http.StatusBadRequest)
-		return
-	}
-
-	user, err := h.userDb.GetByEmail(requestData.Email)
-	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	if err := VerifyPassword(user.PasswordHash, requestData.Password); err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-		return
-	}
-
-	cookie := &http.Cookie{
-		Name:     "user_token",
-		Value:    user.ID,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-	}
-
-	http.SetCookie(w, cookie)
-
-	fmt.Fprintln(w, "Login successful for user", user.ID)
 }
 
 func (h *apiHandler) GetUser(w http.ResponseWriter, req *http.Request) {
