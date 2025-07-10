@@ -86,10 +86,11 @@ func main() {
 	userStoreImpl := &userStoreImpl{db: db}
 
 	authService := &authServiceImpl{
-		userDb:         userStoreImpl,
-		refreshTokenDb: &refreshTokenStoreImpl{db: db},
-		jwtSecret:      []byte(os.Getenv("JWT_SECRET")),
-		accessTokenTTL: 15 * time.Minute,
+		userDb:          userStoreImpl,
+		refreshTokenDb:  &refreshTokenStoreImpl{db: db},
+		jwtSecret:       []byte(os.Getenv("JWT_SECRET")),
+		accessTokenTTL:  15 * time.Minute,
+		refreshTokenTTL: 24 * time.Hour,
 	}
 
 	authHandler := &authHandler{

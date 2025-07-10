@@ -26,7 +26,8 @@ type RegisterResponse struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type RefreshRequest struct {
@@ -39,18 +40,18 @@ type RefreshResponse struct {
 
 type authService interface {
 	Register(email, password string) (*User, error)
-	Login(email, password string) (string, error)
 	GenerateAccessToken(user *User) (string, error)
 	ValidateToken(tokenString string) (jwt.MapClaims, error)
-	LoginWithRefreshToken(email, password string, RefreshTokenTTL time.Duration) (accessToken, refreshToken string, err error)
+	Login(email, password string) (accessToken, refreshToken string, err error)
 	RefreshAccessToken(refreshToken string) (string, error)
 }
 
 type authServiceImpl struct {
-	userDb         userStore
-	refreshTokenDb refreshTokenStore
-	jwtSecret      []byte
-	accessTokenTTL time.Duration
+	userDb          userStore
+	refreshTokenDb  refreshTokenStore
+	jwtSecret       []byte
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
 func (a *authServiceImpl) Register(email, password string) (*User, error) {
@@ -76,22 +77,27 @@ func (a *authServiceImpl) Register(email, password string) (*User, error) {
 	return user, nil
 }
 
-func (a *authServiceImpl) Login(email, password string) (string, error) {
+func (a *authServiceImpl) Login(email, password string) (accessToken, refreshTokenString string, err error) {
 	user, err := a.userDb.GetByEmail(email)
 	if err != nil {
-		return "", ErrInvalidCredentials
+		return "", "", ErrInvalidCredentials
 	}
 
 	if err := VerifyPassword(user.PasswordHash, password); err != nil {
-		return "", ErrInvalidCredentials
+		return "", "", ErrInvalidCredentials
 	}
 
-	token, err := a.GenerateAccessToken(&user)
+	accessToken, err = a.GenerateAccessToken(&user)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return token, nil
+	refreshToken, err := a.refreshTokenDb.GenerateRefreshToken(user.ID, a.refreshTokenTTL)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken.Token, nil
 }
 
 func (a *authServiceImpl) GenerateAccessToken(user *User) (string, error) {
@@ -135,29 +141,6 @@ func (a *authServiceImpl) ValidateToken(tokenString string) (jwt.MapClaims, erro
 	}
 
 	return nil, ErrInvalidToken
-}
-
-func (a *authServiceImpl) LoginWithRefreshToken(email, password string, refreshTokenTTL time.Duration) (accessToken, refreshTokenString string, err error) {
-	user, err := a.userDb.GetByEmail(email)
-	if err != nil {
-		return "", "", ErrInvalidCredentials
-	}
-
-	if err := VerifyPassword(user.PasswordHash, password); err != nil {
-		return "", "", ErrInvalidCredentials
-	}
-
-	accessToken, err = a.GenerateAccessToken(&user)
-	if err != nil {
-		return "", "", err
-	}
-
-	refreshToken, err := a.refreshTokenDb.GenerateRefreshToken(user.ID, refreshTokenTTL)
-	if err != nil {
-		return "", "", err
-	}
-
-	return accessToken, refreshToken.Token, nil
 }
 
 func (a *authServiceImpl) RefreshAccessToken(refreshTokenString string) (string, error) {

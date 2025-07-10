@@ -62,7 +62,7 @@ func (h *authHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	token, err := h.authService.Login(requestData.Email, requestData.Password)
+	accessToken, refreshToken, err := h.authService.Login(requestData.Email, requestData.Password)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
@@ -72,7 +72,7 @@ func (h *authHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	response := &LoginResponse{Token: token}
+	response := &LoginResponse{AccessToken: accessToken, RefreshToken: refreshToken}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
