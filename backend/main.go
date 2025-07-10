@@ -30,7 +30,7 @@ var (
 	usersPathRegEx       = regexp.MustCompile(`^user\/*$`)
 	usersPathWithIdRegEx = regexp.MustCompile(`^user\/([a-z0-9-]+)$`)
 	urlsPathRegEx        = regexp.MustCompile(`^url\/*$`)
-	urlsPathWithIdRegEx  = regexp.MustCompile(`^url\/([a-z0-9]+)$`)
+	urlsPathWithIdRegEx  = regexp.MustCompile(`^url\/([a-z0-9-]+)$`)
 )
 
 func authMiddleware(authService authService) func(http.Handler) http.Handler {
