@@ -31,6 +31,8 @@ var (
 	usersPathWithIdRegEx = regexp.MustCompile(`^user\/([a-z0-9-]+)$`)
 	urlsPathRegEx        = regexp.MustCompile(`^url\/*$`)
 	urlsPathWithIdRegEx  = regexp.MustCompile(`^url\/([a-z0-9-]+)$`)
+	emailRegEx           = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	passwordRegEx        = regexp.MustCompile(`^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$`)
 )
 
 func authMiddleware(authService authService) func(http.Handler) http.Handler {

@@ -35,8 +35,8 @@ func (h *authHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if requestData.Email == "" || requestData.Password == "" {
-		http.Error(w, "Email, username, and password are required", http.StatusBadRequest)
+	if !emailRegEx.MatchString(requestData.Email) || !passwordRegEx.MatchString(requestData.Password) {
+		http.Error(w, "Incorrect email/password format", http.StatusBadRequest)
 		return
 	}
 
@@ -69,6 +69,11 @@ func (h *authHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if !emailRegEx.MatchString(requestData.Email) || !passwordRegEx.MatchString(requestData.Password) {
+		http.Error(w, "Incorrect email/password format", http.StatusBadRequest)
+		return
+	}
+
 	accessToken, refreshToken, err := h.authService.Login(requestData.Email, requestData.Password)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
@@ -89,6 +94,12 @@ func (h *authHandler) RefreshToken(w http.ResponseWriter, req *http.Request) {
 
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		http.Error(w, "Invalid data", http.StatusBadRequest)
+		return
+	}
+
+	_, err := uuid.Parse(requestData.RefreshToken)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
 		return
 	}
 
@@ -214,6 +225,12 @@ func (h *apiHandler) ListUrls(w http.ResponseWriter, req *http.Request) {
 func (h *apiHandler) GetUrl(w http.ResponseWriter, req *http.Request) {
 	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
 
+	_, err := uuid.Parse(urlID)
+	if err != nil {
+		http.Error(w, "Invalid url ID", http.StatusBadRequest)
+		return
+	}
+
 	entry, err := h.urlDb.GetByID(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
@@ -244,6 +261,12 @@ func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
 	}
 
 	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
+
+	_, err := uuid.Parse(urlID)
+	if err != nil {
+		http.Error(w, "Invalid url ID", http.StatusBadRequest)
+		return
+	}
 
 	url, err := h.urlDb.GetByID(urlID)
 	if err != nil {
@@ -279,6 +302,12 @@ func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
 func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
 	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
 
+	_, err := uuid.Parse(urlID)
+	if err != nil {
+		http.Error(w, "Invalid url ID", http.StatusBadRequest)
+		return
+	}
+
 	url, err := h.urlDb.GetByID(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
@@ -307,6 +336,12 @@ func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
 func (h *apiHandler) GetUser(w http.ResponseWriter, req *http.Request) {
 	userID := strings.TrimPrefix(req.PathValue("route"), "user/")
 
+	_, err := uuid.Parse(userID)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
 	userIDFromCtx := GetUserIDFromCtx(req)
 	if userIDFromCtx != userID {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -334,9 +369,20 @@ func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
 
 	userID := strings.TrimPrefix(req.PathValue("route"), "user/")
 
+	_, err := uuid.Parse(userID)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
 	userIDFromCtx := GetUserIDFromCtx(req)
 	if userIDFromCtx != userID {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if !emailRegEx.MatchString(requestData.Email) || !passwordRegEx.MatchString(requestData.Password) {
+		http.Error(w, "Incorrect email/password format", http.StatusBadRequest)
 		return
 	}
 
@@ -364,6 +410,12 @@ func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
 
 func (h *apiHandler) DeleteUser(w http.ResponseWriter, req *http.Request) {
 	userID := strings.TrimPrefix(req.PathValue("route"), "user/")
+
+	_, err := uuid.Parse(userID)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
 
 	userIDFromCtx := GetUserIDFromCtx(req)
 	if userIDFromCtx != userID {
