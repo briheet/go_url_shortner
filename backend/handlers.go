@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -181,11 +182,13 @@ func (h *apiHandler) CreateUrl(w http.ResponseWriter, req *http.Request) {
 
 	if err := h.urlDb.Add(entry); err != nil {
 		http.Error(w, "Error creating URL", http.StatusInternalServerError)
-		fmt.Println("Error creating URL for user", userId.Value, ":", err)
+		log.Println("Error creating URL for user", userId.Value, ":", err)
 		return
 	}
 
-	fmt.Fprintln(w, "Short URL created", requestData.ShortUrl)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(entry)
 }
 
 func (h *apiHandler) ListUrls(w http.ResponseWriter, req *http.Request) {
@@ -194,112 +197,126 @@ func (h *apiHandler) ListUrls(w http.ResponseWriter, req *http.Request) {
 	urls, err := h.urlDb.List(userId.Value)
 	if err != nil {
 		http.Error(w, "Error fetching URLs", http.StatusInternalServerError)
-		fmt.Println("Error fetching URLs for user", userId.Value, ":", err)
+		log.Println("Error fetching URLs for user", userId.Value, ":", err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(urls); err != nil {
-		http.Error(w, "Error encoding Data", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println("Urls listed for user", userId.Value)
+	json.NewEncoder(w).Encode(urls)
 }
 
 func (h *apiHandler) GetUrl(w http.ResponseWriter, req *http.Request) {
-	urlId := strings.TrimPrefix(req.PathValue("route"), "urls/")
+	urlID := strings.TrimPrefix(req.PathValue("route"), "urls/")
 
-	entry, err := h.urlDb.Get(urlId)
+	entry, err := h.urlDb.Get(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
+		log.Println("Error fetching URL :", err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(entry); err != nil {
-		http.Error(w, "Error encoding data", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println("Url fetched", req.PathValue("route"))
+	json.NewEncoder(w).Encode(&entry)
 }
 
 func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("Url updated", req.PathValue("route"))
-	fmt.Fprintln(w, "API endpoint reached", req.URL.Path)
-}
+	var requestData struct {
+		ShortUrl string `json:"short_url"`
+		LongUrl  string `json:"long_url"`
+	}
 
-func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
-	urlId := strings.TrimPrefix(req.PathValue("route"), "urls/")
-
-	if err := h.urlDb.Remove(urlId); err != nil {
-		http.Error(w, "Error deleting URL", http.StatusInternalServerError)
-		fmt.Println("Error deleting URL:", err)
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid Data", http.StatusBadRequest)
+		log.Println("Error decoding data :", err)
 		return
 	}
 
-	fmt.Println("Url deleted", req.PathValue("route"))
-	fmt.Fprintln(w, "URL deleted", urlId)
+	urlID := strings.TrimPrefix(req.PathValue("route"), "urls/")
+
+	entry := &Url{
+		ID:       urlID,
+		ShortUrl: requestData.ShortUrl,
+		LongUrl:  requestData.LongUrl,
+	}
+
+	if err := h.urlDb.Update(urlID, entry); err != nil {
+		http.Error(w, "Error updating URL", http.StatusInternalServerError)
+		log.Println("Error updating URL", urlID, ":", err)
+		return
+	}
+
+	url, err := h.urlDb.Get(urlID)
+	if err != nil {
+		http.Error(w, "Error fetching updated URL", http.StatusInternalServerError)
+		log.Println("Error fetching updated URL", urlID, ":", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(url)
+}
+
+func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
+	urlID := strings.TrimPrefix(req.PathValue("route"), "urls/")
+
+	if err := h.urlDb.Remove(urlID); err != nil {
+		http.Error(w, "Error deleting URL", http.StatusInternalServerError)
+		log.Println("Error deleting URL :", err)
+		return
+	}
+
+	log.Println("Url deleted", urlID)
+	fmt.Fprintln(w, "URL", urlID, "deleted successfully")
 }
 
 func (h *apiHandler) GetUser(w http.ResponseWriter, req *http.Request) {
-	userId := strings.TrimPrefix(req.PathValue("route"), "users/")
+	userID := strings.TrimPrefix(req.PathValue("route"), "users/")
 
-	entry, err := h.userDb.GetById(userId)
+	entry, err := h.userDb.GetById(userID)
 	if err != nil {
 		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(entry); err != nil {
-		http.Error(w, "Error encoding data", http.StatusInternalServerError)
-		fmt.Println("Error encoding user data:", err)
-		return
-	}
-
-	fmt.Println("User fetched", userId)
+	json.NewEncoder(w).Encode(&entry)
 }
 
 func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
-	var requestData struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	var requestData Credentials
 
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		http.Error(w, "Invalid Data", http.StatusBadRequest)
-		fmt.Println("Error decoding data:", err)
+		log.Println("Error decoding data :", err)
 		return
 	}
 
-	userId := strings.TrimPrefix(req.PathValue("route"), "users/")
+	userID := strings.TrimPrefix(req.PathValue("route"), "users/")
 
 	hashedPassword, passErr := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
 	if passErr != nil {
-		http.Error(w, "Error hashing password", http.StatusInternalServerError)
+		http.Error(w, "Error updating password", http.StatusInternalServerError)
 		return
 	}
 
 	user := &User{
-		ID:           userId,
+		ID:           userID,
 		Email:        requestData.Email,
 		PasswordHash: string(hashedPassword),
 	}
 
-	h.userDb.Update(userId, user)
+	h.userDb.Update(userID, user)
 }
 
 func (h *apiHandler) DeleteUser(w http.ResponseWriter, req *http.Request) {
-	userId := strings.TrimPrefix(req.PathValue("route"), "users/")
+	userID := strings.TrimPrefix(req.PathValue("route"), "users/")
 
-	if err := h.userDb.Remove(userId); err != nil {
+	if err := h.userDb.Remove(userID); err != nil {
 		http.Error(w, "Error deleting user", http.StatusInternalServerError)
-		fmt.Println("Error deleting user:", err)
+		log.Println("Error deleting user", userID, ":", err)
 		return
 	}
 
-	fmt.Println("User deleted", userId)
-	fmt.Fprintln(w, "User deleted", userId)
+	log.Println("User deleted:", userID)
+	fmt.Fprintln(w, "User", userID, "deleted successfully")
 }
