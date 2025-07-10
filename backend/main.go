@@ -88,12 +88,15 @@ func main() {
 
 	db.AutoMigrate(&User{}, &Url{}, &RefreshToken{})
 
+	port := os.Getenv("PORT")
+	jwtSecretString := os.Getenv("JWT_SECRET")
+
 	userStoreImpl := &userStoreImpl{db: db}
 	urlStoreImpl := &urlStoreImpl{db: db}
 	authService := &authServiceImpl{
 		userDb:          userStoreImpl,
 		refreshTokenDb:  &refreshTokenStoreImpl{db: db},
-		jwtSecret:       []byte(os.Getenv("JWT_SECRET")),
+		jwtSecret:       []byte(jwtSecretString),
 		accessTokenTTL:  15 * time.Minute,
 		refreshTokenTTL: 24 * time.Hour,
 	}
@@ -108,8 +111,6 @@ func main() {
 		urlDb:  urlStoreImpl,
 		userDb: userStoreImpl,
 	}
-
-	port := os.Getenv("PORT")
 
 	http.Handle("/{short_url}", shortUrlHandler)
 	http.HandleFunc("POST /api/auth/register", authHandler.RegisterUser)
