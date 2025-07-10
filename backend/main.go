@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -78,7 +78,7 @@ func main() {
 	db, dbErr := initDB()
 
 	if dbErr != nil {
-		fmt.Println("Error initializing database:", dbErr)
+		log.Fatalln("Error initializing database:", dbErr)
 	}
 
 	db.AutoMigrate(&User{}, &Url{}, &RefreshToken{})
@@ -109,13 +109,12 @@ func main() {
 	http.HandleFunc("POST /api/auth/refresh", authHandler.RefreshToken)
 	http.Handle("/api/{route...}", authMiddleware(authService)(apiHandler))
 
-	fmt.Println("Starting application on port", 8090)
+	log.Println("Starting application on port", 8090)
 	err := http.ListenAndServe(":8090", nil)
 
 	if errors.Is(err, http.ErrServerClosed) {
-		fmt.Println("Server Closed")
+		log.Fatalln("Server Closed")
 	} else if err != nil {
-		fmt.Println("Error starting server:", err)
-		os.Exit(1)
+		log.Fatalln("Error starting server:", err)
 	}
 }
