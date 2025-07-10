@@ -19,7 +19,7 @@ type urlRequest struct {
 }
 
 func (h *shortUrlHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	url, err := h.urlDb.Get(req.URL.Path[1:])
+	url, err := h.urlDb.GetByShortURL(req.URL.Path[1:])
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusNotFound)
 		return
@@ -214,7 +214,7 @@ func (h *apiHandler) ListUrls(w http.ResponseWriter, req *http.Request) {
 func (h *apiHandler) GetUrl(w http.ResponseWriter, req *http.Request) {
 	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
 
-	entry, err := h.urlDb.Get(urlID)
+	entry, err := h.urlDb.GetByID(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
 		log.Println("Error fetching URL :", err)
@@ -245,7 +245,7 @@ func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
 
 	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
 
-	url, err := h.urlDb.Get(urlID)
+	url, err := h.urlDb.GetByID(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
 		log.Println("Error fetching URL", urlID, ":", err)
@@ -279,7 +279,7 @@ func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
 func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
 	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
 
-	url, err := h.urlDb.Get(urlID)
+	url, err := h.urlDb.GetByID(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
 		log.Println("Error fetching URL", urlID, ":", err)

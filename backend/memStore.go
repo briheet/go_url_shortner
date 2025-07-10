@@ -14,7 +14,8 @@ import (
 
 type urlStore interface {
 	Add(entry *Url) error
-	Get(urlID string) (Url, error)
+	GetByID(urlID string) (Url, error)
+	GetByShortURL(shortUrl string) (Url, error)
 	Update(urlId string, entry *Url) error
 	List(userToken string) ([]Url, error)
 	Remove(urlId string) error
@@ -51,9 +52,15 @@ func (s *urlStoreImpl) Add(entry *Url) error {
 	return result.Error
 }
 
-func (s *urlStoreImpl) Get(urlID string) (Url, error) {
+func (s *urlStoreImpl) GetByID(urlID string) (Url, error) {
 	var entry Url
-	result := s.db.First(&entry, urlID)
+	result := s.db.First(&entry, "id = ?", urlID)
+	return entry, result.Error
+}
+
+func (s *urlStoreImpl) GetByShortURL(shortUrl string) (Url, error) {
+	var entry Url
+	result := s.db.First(&entry, "short_url = ?", shortUrl)
 	return entry, result.Error
 }
 
