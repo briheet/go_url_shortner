@@ -78,7 +78,7 @@ func authMiddleware(authService authService) func(http.Handler) http.Handler {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalln("Error loading .env file:", err)
+		log.Println("Error loading .env file:", err)
 	}
 
 	db, err := initDB()
