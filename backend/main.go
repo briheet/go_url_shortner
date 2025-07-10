@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 )
 
 type apiHandler struct {
@@ -26,10 +27,10 @@ type authHandler struct {
 }
 
 var (
-	usersPathRegEx       = regexp.MustCompile(`^users\/*$`)
-	usersPathWithIdRegEx = regexp.MustCompile(`^users\/([a-z0-9-]+)$`)
-	urlsPathRegEx        = regexp.MustCompile(`^urls\/*$`)
-	urlsPathWithIdRegEx  = regexp.MustCompile(`^urls\/([a-z0-9]+)$`)
+	usersPathRegEx       = regexp.MustCompile(`^user\/*$`)
+	usersPathWithIdRegEx = regexp.MustCompile(`^user\/([a-z0-9-]+)$`)
+	urlsPathRegEx        = regexp.MustCompile(`^url\/*$`)
+	urlsPathWithIdRegEx  = regexp.MustCompile(`^url\/([a-z0-9]+)$`)
 )
 
 func authMiddleware(authService authService) func(http.Handler) http.Handler {
@@ -75,16 +76,20 @@ func authMiddleware(authService authService) func(http.Handler) http.Handler {
 }
 
 func main() {
-	db, dbErr := initDB()
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalln("Error loading .env file:", err)
+	}
 
-	if dbErr != nil {
-		log.Fatalln("Error initializing database:", dbErr)
+	db, err := initDB()
+	if err != nil {
+		log.Fatalln("Error initializing database:", err)
 	}
 
 	db.AutoMigrate(&User{}, &Url{}, &RefreshToken{})
 
 	userStoreImpl := &userStoreImpl{db: db}
-
+	urlStoreImpl := &urlStoreImpl{db: db}
 	authService := &authServiceImpl{
 		userDb:          userStoreImpl,
 		refreshTokenDb:  &refreshTokenStoreImpl{db: db},
@@ -96,22 +101,24 @@ func main() {
 	authHandler := &authHandler{
 		authService: authService,
 	}
-
+	shortUrlHandler := &shortUrlHandler{
+		urlDb: urlStoreImpl,
+	}
 	apiHandler := &apiHandler{
-		urlDb:  &urlStoreImpl{db: db},
+		urlDb:  urlStoreImpl,
 		userDb: userStoreImpl,
 	}
 
-	http.Handle("/{short_url}", &shortUrlHandler{
-		urlDb: &urlStoreImpl{db: db},
-	})
+	port := os.Getenv("PORT")
+
+	http.Handle("/{short_url}", shortUrlHandler)
 	http.HandleFunc("POST /api/auth/register", authHandler.RegisterUser)
 	http.HandleFunc("POST /api/auth/login", authHandler.LoginUser)
 	http.HandleFunc("POST /api/auth/refresh", authHandler.RefreshToken)
 	http.Handle("/api/{route...}", authMiddleware(authService)(apiHandler))
 
-	log.Println("Starting application on port", 8090)
-	err := http.ListenAndServe(":8090", nil)
+	log.Println("Starting application on port", port)
+	err = http.ListenAndServe(":"+port, nil)
 
 	if errors.Is(err, http.ErrServerClosed) {
 		log.Fatalln("Server Closed")

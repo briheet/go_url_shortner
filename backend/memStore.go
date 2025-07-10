@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -143,11 +142,6 @@ func (s *refreshTokenStoreImpl) RevokeRefreshToken(token *RefreshToken) error {
 }
 
 func initDB() (*gorm.DB, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
