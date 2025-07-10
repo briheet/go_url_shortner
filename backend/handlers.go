@@ -12,6 +12,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type urlRequest struct {
+	ID       string `json:"id"`
+	ShortUrl string `json:"short_url"`
+	LongUrl  string `json:"long_url"`
+}
+
 func (h *shortUrlHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url, err := h.urlDb.Get(req.URL.Path[1:])
 	if err != nil {
@@ -166,7 +172,7 @@ func (h *apiHandler) CreateUrl(w http.ResponseWriter, req *http.Request) {
 		LongUrl  string `json:"long_url"`
 	}
 
-	userId, _ := req.Cookie("user_token")
+	userIDFromCtx := GetUserIDFromCtx(req)
 
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		http.Error(w, "Invalid Data", http.StatusBadRequest)
@@ -177,12 +183,12 @@ func (h *apiHandler) CreateUrl(w http.ResponseWriter, req *http.Request) {
 		ID:       uuid.NewString(),
 		ShortUrl: requestData.ShortUrl,
 		LongUrl:  requestData.LongUrl,
-		UserId:   userId.Value,
+		UserId:   userIDFromCtx,
 	}
 
 	if err := h.urlDb.Add(entry); err != nil {
 		http.Error(w, "Error creating URL", http.StatusInternalServerError)
-		log.Println("Error creating URL for user", userId.Value, ":", err)
+		log.Println("Error creating URL for user", userIDFromCtx, ":", err)
 		return
 	}
 
@@ -192,12 +198,12 @@ func (h *apiHandler) CreateUrl(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *apiHandler) ListUrls(w http.ResponseWriter, req *http.Request) {
-	userId, _ := req.Cookie("user_token")
+	userIDFromCtx := GetUserIDFromCtx(req)
 
-	urls, err := h.urlDb.List(userId.Value)
+	urls, err := h.urlDb.List(userIDFromCtx)
 	if err != nil {
 		http.Error(w, "Error fetching URLs", http.StatusInternalServerError)
-		log.Println("Error fetching URLs for user", userId.Value, ":", err)
+		log.Println("Error fetching URLs for user", userIDFromCtx, ":", err)
 		return
 	}
 
@@ -206,12 +212,18 @@ func (h *apiHandler) ListUrls(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *apiHandler) GetUrl(w http.ResponseWriter, req *http.Request) {
-	urlID := strings.TrimPrefix(req.PathValue("route"), "urls/")
+	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
 
 	entry, err := h.urlDb.Get(urlID)
 	if err != nil {
 		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
 		log.Println("Error fetching URL :", err)
+		return
+	}
+
+	userIDFromCtx := GetUserIDFromCtx(req)
+	if entry.UserId != userIDFromCtx {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -231,7 +243,22 @@ func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	urlID := strings.TrimPrefix(req.PathValue("route"), "urls/")
+	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
+
+	url, err := h.urlDb.Get(urlID)
+	if err != nil {
+		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
+		log.Println("Error fetching URL", urlID, ":", err)
+		return
+	}
+
+	userID := url.UserId
+
+	userIDFromCtx := GetUserIDFromCtx(req)
+	if userIDFromCtx != userID {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	entry := &Url{
 		ID:       urlID,
@@ -245,19 +272,27 @@ func (h *apiHandler) UpdateUrl(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	url, err := h.urlDb.Get(urlID)
-	if err != nil {
-		http.Error(w, "Error fetching updated URL", http.StatusInternalServerError)
-		log.Println("Error fetching updated URL", urlID, ":", err)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(url)
+	json.NewEncoder(w).Encode(entry)
 }
 
 func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
-	urlID := strings.TrimPrefix(req.PathValue("route"), "urls/")
+	urlID := strings.TrimPrefix(req.PathValue("route"), "url/")
+
+	url, err := h.urlDb.Get(urlID)
+	if err != nil {
+		http.Error(w, "Error fetching URL", http.StatusInternalServerError)
+		log.Println("Error fetching URL", urlID, ":", err)
+		return
+	}
+
+	userID := url.UserId
+
+	userIDFromCtx := GetUserIDFromCtx(req)
+	if userIDFromCtx != userID {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	if err := h.urlDb.Remove(urlID); err != nil {
 		http.Error(w, "Error deleting URL", http.StatusInternalServerError)
@@ -270,7 +305,13 @@ func (h *apiHandler) DeleteUrl(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *apiHandler) GetUser(w http.ResponseWriter, req *http.Request) {
-	userID := strings.TrimPrefix(req.PathValue("route"), "users/")
+	userID := strings.TrimPrefix(req.PathValue("route"), "user/")
+
+	userIDFromCtx := GetUserIDFromCtx(req)
+	if userIDFromCtx != userID {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	entry, err := h.userDb.GetById(userID)
 	if err != nil {
@@ -291,7 +332,13 @@ func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	userID := strings.TrimPrefix(req.PathValue("route"), "users/")
+	userID := strings.TrimPrefix(req.PathValue("route"), "user/")
+
+	userIDFromCtx := GetUserIDFromCtx(req)
+	if userIDFromCtx != userID {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	hashedPassword, passErr := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
 	if passErr != nil {
@@ -305,11 +352,24 @@ func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
 		PasswordHash: string(hashedPassword),
 	}
 
-	h.userDb.Update(userID, user)
+	if err := h.userDb.Update(userID, user); err != nil {
+		http.Error(w, "Error updating user", http.StatusInternalServerError)
+		log.Println("Error updating user", userID, ":", err)
+		return
+	}
+
+	log.Println("User updated:", userID)
+	fmt.Fprintln(w, "User", userID, "updated successfully")
 }
 
 func (h *apiHandler) DeleteUser(w http.ResponseWriter, req *http.Request) {
-	userID := strings.TrimPrefix(req.PathValue("route"), "users/")
+	userID := strings.TrimPrefix(req.PathValue("route"), "user/")
+
+	userIDFromCtx := GetUserIDFromCtx(req)
+	if userIDFromCtx != userID {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	if err := h.userDb.Remove(userID); err != nil {
 		http.Error(w, "Error deleting user", http.StatusInternalServerError)

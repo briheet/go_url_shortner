@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -164,4 +165,9 @@ func HashPassword(password string) (string, error) {
 
 func VerifyPassword(hashedPassword, providedPassword string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(providedPassword))
+}
+
+func GetUserIDFromCtx(r *http.Request) string {
+	userID := r.Context().Value("userID").(string)
+	return userID
 }

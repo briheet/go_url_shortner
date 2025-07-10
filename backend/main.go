@@ -62,13 +62,13 @@ func authMiddleware(authService authService) func(http.Handler) http.Handler {
 				return
 			}
 
-			userID, err := uuid.Parse(userIDStr)
+			_, err = uuid.Parse(userIDStr)
 			if err != nil {
 				http.Error(w, "Invalid user ID in token", http.StatusUnauthorized)
 				return
 			}
 
-			ctx := context.WithValue(req.Context(), "userID", userID)
+			ctx := context.WithValue(req.Context(), "userID", userIDStr)
 
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
