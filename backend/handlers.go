@@ -35,8 +35,13 @@ func (h *authHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !emailRegEx.MatchString(requestData.Email) || !passwordRegEx.MatchString(requestData.Password) {
-		http.Error(w, "Incorrect email/password format", http.StatusBadRequest)
+	if !emailRegEx.MatchString(requestData.Email) {
+		http.Error(w, "Incorrect email format", http.StatusBadRequest)
+		return
+	}
+
+	if err := ValidatePassword(requestData.Password); err != nil {
+		http.Error(w, "Invalid password: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -69,8 +74,13 @@ func (h *authHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !emailRegEx.MatchString(requestData.Email) || !passwordRegEx.MatchString(requestData.Password) {
-		http.Error(w, "Incorrect email/password format", http.StatusBadRequest)
+	if !emailRegEx.MatchString(requestData.Email) {
+		http.Error(w, "Incorrect email format", http.StatusBadRequest)
+		return
+	}
+
+	if err := ValidatePassword(requestData.Password); err != nil {
+		http.Error(w, "Invalid password: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -186,7 +196,7 @@ func (h *apiHandler) CreateUrl(w http.ResponseWriter, req *http.Request) {
 	userIDFromCtx := GetUserIDFromCtx(req)
 
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid Data", http.StatusBadRequest)
+		http.Error(w, "Invalid data", http.StatusBadRequest)
 		return
 	}
 
@@ -362,7 +372,7 @@ func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
 	var requestData Credentials
 
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid Data", http.StatusBadRequest)
+		http.Error(w, "Invalid data", http.StatusBadRequest)
 		log.Println("Error decoding data :", err)
 		return
 	}
@@ -381,8 +391,13 @@ func (h *apiHandler) UpdateUser(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !emailRegEx.MatchString(requestData.Email) || !passwordRegEx.MatchString(requestData.Password) {
-		http.Error(w, "Incorrect email/password format", http.StatusBadRequest)
+	if !emailRegEx.MatchString(requestData.Email) {
+		http.Error(w, "Incorrect email format", http.StatusBadRequest)
+		return
+	}
+
+	if err := ValidatePassword(requestData.Password); err != nil {
+		http.Error(w, "Invalid password: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 

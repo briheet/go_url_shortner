@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -172,6 +174,38 @@ func HashPassword(password string) (string, error) {
 
 func VerifyPassword(hashedPassword, providedPassword string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(providedPassword))
+}
+
+func ValidatePassword(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters long")
+	}
+
+	hasLower, _ := regexp.MatchString(`[a-z]`, password)
+	hasUpper, _ := regexp.MatchString(`[A-Z]`, password)
+	hasDigit, _ := regexp.MatchString(`\d`, password)
+	hasSpecial, _ := regexp.MatchString(`[@$!%*?&]`, password)
+
+	if !hasLower {
+		return errors.New("Password must contain at least one lowercase letter")
+	}
+	if !hasUpper {
+		return errors.New("Password must contain at least one uppercase letter")
+	}
+	if !hasDigit {
+		return errors.New("Password must contain at least one digit")
+	}
+	if !hasSpecial {
+		return errors.New("Password must contain at least one special character ( @$!%*?& )")
+	}
+
+	// Check allowed characters only
+	validChars, _ := regexp.MatchString(`^[A-Za-z\d@$!%*?&]{8,}$`, password)
+	if !validChars {
+		return errors.New("Password contains invalid characters")
+	}
+
+	return nil
 }
 
 func GetUserIDFromCtx(r *http.Request) string {
