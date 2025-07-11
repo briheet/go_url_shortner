@@ -1,6 +1,6 @@
-module url_shortener
+module github.com/dragon-slayer875/go_url_shortner
 
-go 1.24.4
+go 1.24.2
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
